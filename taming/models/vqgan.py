@@ -27,6 +27,10 @@ class VQModel(pl.LightningModule):
         self.image_key = image_key
         self.encoder = Encoder(**ddconfig)
         self.decoder = Decoder(**ddconfig)
+        self.sigmoid_flag = ddconfig.get("sigmoid_flag", False)
+        self.noise_adding = ddconfig.get("noise_adding", False)
+        self.noise_magnitude = ddconfig.get("noise_magnitude", False)
+
         self.loss = instantiate_from_config(lossconfig)
         self.quantize = VectorQuantizer(n_embed, embed_dim, beta=0.25,
                                         remap=remap, sane_index_shape=sane_index_shape)
@@ -54,6 +58,10 @@ class VQModel(pl.LightningModule):
 
     def encode(self, x):
         h = self.encoder(x)
+        if self.sigmoid_flag:
+            h = F.sigmoid(h)
+        if self.noise_adding:
+            h = h + torch.randn_like(h) * self.noise_magnitude
         h = self.quant_conv(h)
         quant, emb_loss, info = self.quantize(h)
         return quant, emb_loss, info
